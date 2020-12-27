@@ -11,17 +11,22 @@ from RUclassifyLeaf import classify
 
 import random
 
+model_name = 'KNN'
+
 def my_help(update: Update, context):
     a = """
     /start - начать чат
     /help - список существующих команд
     /trees_list - известные мне деревья
+    /model - вывести текущую модель
     Если лист дерева сложный (состоит из нескольких маленьких), сфотографируйте только верхний листик, пожалуйста
     """
     update.message.reply_text(a)
 
+
 def start(update, context):
     update.message.reply_text('Отправьте мне фото листа на светлом нейтральном фоне. Я постараюсь определить, какому дереву он принадлежал :)')
+
 
 def get_image(update: Update, context):
     file_id = update.message.photo[-1].file_id
@@ -36,44 +41,42 @@ def get_image(update: Update, context):
             'Всё в порядке, обрабатываю',
         ]))
         features = process(checkedImage,cnt,coord)
-        result1, result2, result3 = classify(features)
-        if result3 == 0:
-            if result2 == 0:
-                keyboard = [[InlineKeyboardButton(result1.capitalize(), 
-                                                  callback_data=result1)]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                update.message.reply_text('Скорее всего, это ' + result1 +
-                                          '. Подробнее об этом виде:', reply_markup=reply_markup)
-            else:
-                keyboard = [[InlineKeyboardButton(result1.capitalize(),
-                                                  callback_data=result1)],
-                [InlineKeyboardButton(result2.capitalize(),
-                                      callback_data=result2)]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                update.message.reply_text('Похоже, это ' + result1 + ' или ' + 
-                                      result2 + '. Вот их описания:', 
-                                      reply_markup=reply_markup)
-        else:
-            keyboard = [[InlineKeyboardButton(result1.capitalize(),
-                                              callback_data=result1)],
-                 [InlineKeyboardButton(result2.capitalize(),
-                                      callback_data=result2)],
-                 [InlineKeyboardButton(result3.capitalize(),
-                                      callback_data=result3)]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            update.message.reply_text('Кажется, это ' + result1 + ' или '
-                                          + result2 + '. Но может быть и ' +
-                                          result3 + "! Подробнее о них:", reply_markup=reply_markup)
+        result1 = classify(features, model_name)
+        keyboard = [[InlineKeyboardButton(result1.capitalize(), 
+                                          callback_data=result1)]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_text('Скорее всего, это ' + result1 +
+                                  '. Подробнее об этом виде:', reply_markup=reply_markup)
     else:
         update.message.reply_text(checkedImage)
 
+
 def reply_text(update, context):
-    update.message.reply_text(random.choice([
-        'Следите, чтобы пальцы не попали в кадр',
-        'Хотите узнать, какое рядом с вами дерево?',
-        'Погода отличная, пора в парк!',
-        'Пожалуйста, отправьте мне фото листика'
-    ]))
+    global model_name
+    ch = update.message.text[0]
+    if ch == '1':
+        model_name = 'KNN'
+        update.message.reply_text('Модель изменена на K-Nearest Neighbors')
+    elif ch == '2':
+        model_name = 'DTC'
+        update.message.reply_text('Модель изменена на Decision Tree')
+    elif ch == '3':
+        model_name = 'GNB'
+        update.message.reply_text('Модель изменена на Gaussian Naive Bayes')
+    elif ch == '4':
+        model_name = 'RFC'
+        update.message.reply_text('Модель изменена на Random Forest')
+    elif ch == '5':
+        model_name = 'SVC'
+        update.message.reply_text('Модель изменена на C-Support Vector Classification')
+    else:
+        update.message.reply_text(random.choice([
+            'Следите, чтобы пальцы не попали в кадр',
+            'Хотите узнать, какое рядом с вами дерево?',
+            'Погода отличная, пора в парк!',
+            'Пожалуйста, отправьте мне фото листика'
+        ]))
+
 
 def trees_list(update, context):
     myfile = open("trees.txt")
@@ -85,8 +88,10 @@ def trees_list(update, context):
 
     update.message.reply_text(u'Виды деревьев:', reply_markup=reply_markup)
 
+
 def create_button(name):
     return InlineKeyboardButton(name.capitalize(), callback_data = name),
+
 
 def on_press_button(update, context):
     query = update.callback_query
@@ -99,9 +104,21 @@ def on_press_button(update, context):
                           chat_id=query.message.chat_id,
                           message_id=query.message.message_id)
 
+
 def get_files(update, context):
     msg = os.listdir('/home/ifmoadmin')
     update.message.reply_text(msg)
+
+
+def model(update, context):
+    update.message.reply_text(
+                f'Текущая модель: {model_name}\n'+
+                'Чтобы сменить модель, отправьте число:\n'+
+                '1. K-Nearest Neighbors\n'+
+                '2. Decision Tree\n' +
+                '3. Gaussian Naive Bayes\n' +
+                '4. Random Forest\n' +
+                '5. C-Support Vector Classification\n')
 
 def main():
     token = open("./t.txt", "r")
@@ -114,10 +131,12 @@ def main():
     updater.dispatcher.add_handler(CallbackQueryHandler(on_press_button))
     updater.dispatcher.add_handler(CommandHandler('get_files', get_files))
     updater.dispatcher.add_handler(CommandHandler('trees_list', trees_list))
+    updater.dispatcher.add_handler(CommandHandler('model', model))
     updater.dispatcher.add_handler(MessageHandler(filters.Filters.photo, get_image))
     updater.dispatcher.add_handler(MessageHandler(filters.Filters.text, reply_text))
     updater.start_polling()
     updater.idle()
+
 
 if __name__ == '__main__':
     main()
